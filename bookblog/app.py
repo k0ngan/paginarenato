@@ -123,64 +123,6 @@ def book_card(b):
                         st.rerun()
                     else:
                         st.warning("El comentario no puede estar vacío.")
-def delete_book(book_id):
-    books = load_json(BOOKS_JSON)
-    books = [b for b in books if b["id"] != book_id]
-    save_json(BOOKS_JSON, books)
-    # Eliminar también comentarios asociados
-    comments = load_json(COMMENTS_JSON)
-    comments = [c for c in comments if c["book_id"] != book_id]
-    save_json(COMMENTS_JSON, comments)
-
-def delete_comment(comment_id):
-    comments = load_json(COMMENTS_JSON)
-    comments = [c for c in comments if c["id"] != comment_id]
-    save_json(COMMENTS_JSON, comments)
-
-def book_card(b):
-    col1, col2 = st.columns([1,3])
-    with col1:
-        if b.get("cover_path") and Path(b["cover_path"]).exists():
-            st.image(b["cover_path"], use_container_width=True)
-        else:
-            st.write("🖼️ Sin portada")
-    with col2:
-        st.subheader(b["title"])
-        meta = []
-        if b.get("author"): meta.append(f"**Autor:** {b['author']}")
-        if b.get("year"): meta.append(f"**Año:** {b['year']}")
-        if b.get("tags"): meta.append("**Tags:** " + ", ".join(b["tags"]))
-        st.markdown("  •  ".join(meta) if meta else "_Sin detalles_")
-        if b.get("description"):
-            st.markdown(b["description"])
-        
-        # Botón para borrar el libro
-        if st.button("🗑️ Borrar libro", key=f"del_book_{b['id']}"):
-            delete_book(b["id"])
-            st.success("Libro eliminado.")
-            st.rerun()
-        
-        with st.expander("💬 Comentarios"):
-            for c in get_comments(b["id"]):
-                st.markdown(f"**{c['user']}** — {c['created_at']}")
-                st.write(c["text"])
-                # Botón para borrar comentario
-                if st.button("Borrar comentario", key=f"del_comment_{c['id']}"):
-                    delete_comment(c['id'])
-                    st.success("Comentario eliminado.")
-                    st.rerun()
-                st.markdown("---")
-            with st.form(f"comment_form_{b['id']}"):
-                user = st.text_input("Tu nombre", key=f"name_{b['id']}")
-                text = st.text_area("Escribe un comentario", key=f"text_{b['id']}")
-                sent = st.form_submit_button("Publicar comentario")
-                if sent:
-                    if text.strip():
-                        add_comment(b["id"], user, text)
-                        st.success("Comentario publicado.")
-                        st.rerun()
-                    else:
-                        st.warning("El comentario no puede estar vacío.")
 
 def main():
     ensure_storage()
