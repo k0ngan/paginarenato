@@ -134,7 +134,7 @@ def main():
     st.sidebar.caption("Deja vacío para ver todo.")
 
     # Tabs
-    tab_list = st.tabs(["🔎 Explorar", "➕ Agregar libro", "ℹ️ Ayuda"])
+    tab_list = st.tabs(["🔎 Explorar", "➕ Agregar libro"])
     # Explorar
     with tab_list[0]:
         results = search_books(q)
