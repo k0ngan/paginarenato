@@ -265,7 +265,7 @@ def book_card(b):
 
 def main():
     ensure_storage()
-    st.title("📚 BookBlog — libros san agustin (Creador de la pagina Renato Pinto)")
+    st.title("📚 BookBlog — publico para la comunidad del san agustin")
 
     # Sidebar: buscador
     st.sidebar.header("Buscar")
