@@ -231,7 +231,7 @@ def main():
 
     st.sidebar.header("🔐 Admin")
     admin_key = st.sidebar.text_input("Clave de administrador", type="password")
-    is_admin = (admin_key == "1234")  # Cambia la clave aquí
+    is_admin = (admin_key == "7518")  # Cambia la clave aquí
 
     # Tabs según permisos
     if is_admin:
@@ -322,7 +322,7 @@ def main():
 
     # Footer copyright
     st.markdown("---")
-    st.markdown("© Renato Pinto", unsafe_allow_html=True)
+    st.markdown("© 2025 Renato Pinto 1ª medio b san agustin. Todos los derechos reservados. ", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
