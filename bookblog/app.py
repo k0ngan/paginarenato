@@ -322,7 +322,7 @@ def main():
 
     # Footer copyright
     st.markdown("---")
-    st.markdown("© 2025 Renato Pinto 1° medio b san agustin. Todos los derechos reservados. ", unsafe_allow_html=True)
+    st.markdown("© 2025 Renato Pinto 1° medio B san agustin. Todos los derechos reservados. ", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
