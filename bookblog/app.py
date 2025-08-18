@@ -24,6 +24,7 @@ COMMENTS_JSON = DATA_DIR / "comments.json"
 # Utilidades de almacenamiento
 # =========================
 def ensure_storage():
+    """Crea carpetas y archivos base si no existen."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     COVERS_DIR.mkdir(parents=True, exist_ok=True)
     if not BOOKS_JSON.exists():
@@ -33,6 +34,7 @@ def ensure_storage():
 
 
 def load_json(path: Path):
+    """Lee JSON seguro; devuelve lista vacía ante error."""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
@@ -40,12 +42,14 @@ def load_json(path: Path):
 
 
 def save_json(path: Path, data):
+    """Escritura atómica de JSON."""
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(path)
 
 
 def save_cover(uploaded_file) -> str | None:
+    """Guarda portada redimensionada como JPEG 85% en data/covers."""
     if not uploaded_file:
         return None
     ext = os.path.splitext(uploaded_file.name)[1].lower() or ".png"
@@ -127,6 +131,7 @@ def export_json_bytes(path: Path) -> bytes:
 
 
 def merge_lists_by_id(old_list: list, new_list: list) -> list:
+    """Fusiona por 'id'. Lo nuevo sobreescribe coincidencias y agrega faltantes."""
     idx = {item.get("id"): i for i, item in enumerate(old_list) if item.get("id")}
     for item in new_list:
         _id = item.get("id")
@@ -138,6 +143,10 @@ def merge_lists_by_id(old_list: list, new_list: list) -> list:
 
 
 def import_json_bytes(path: Path, content: bytes, mode: str = "replace"):
+    """
+    Importa JSON en 'path'.
+    mode: 'replace' (reemplaza todo) o 'merge' (fusiona por id).
+    """
     incoming = json.loads(content.decode("utf-8"))
     if mode == "replace":
         save_json(path, incoming)
@@ -147,6 +156,13 @@ def import_json_bytes(path: Path, content: bytes, mode: str = "replace"):
 
 
 def make_backup_zip_bytes() -> bytes:
+    """
+    Crea un ZIP con:
+      - data/books.json
+      - data/comments.json
+      - data/covers/* (si existen)
+      - manifest.json
+    """
     ensure_storage()
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -167,21 +183,31 @@ def make_backup_zip_bytes() -> bytes:
 
 
 def restore_from_zip_bytes(zip_bytes: bytes, mode: str = "replace"):
+    """
+    Restaura desde un ZIP creado por make_backup_zip_bytes():
+      - Copia covers dentro de data/covers/
+      - Importa books.json y comments.json (replace/merge)
+      - Normaliza rutas de portada si están como nombres sueltos
+    """
     ensure_storage()
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+        # Portadas
         for name in z.namelist():
             if name.startswith("data/covers/") and not name.endswith("/"):
                 out = COVERS_DIR / Path(name).name
                 out.parent.mkdir(parents=True, exist_ok=True)
                 with z.open(name) as src, open(out, "wb") as dst:
                     dst.write(src.read())
+
+        # JSONs
         if "data/books.json" in z.namelist():
             books_bytes = z.read("data/books.json")
             import_json_bytes(BOOKS_JSON, books_bytes, mode=mode)
         if "data/comments.json" in z.namelist():
             comments_bytes = z.read("data/comments.json")
             import_json_bytes(COMMENTS_JSON, comments_bytes, mode=mode)
-        # normalizar rutas
+
+        # Reparar rutas de portada si vinieron como nombres
         books = load_json(BOOKS_JSON)
         changed = False
         for b in books:
@@ -193,19 +219,6 @@ def restore_from_zip_bytes(zip_bytes: bytes, mode: str = "replace"):
                     changed = True
         if changed:
             save_json(BOOKS_JSON, books)
-
-
-# =========================
-# Borrar todo
-# =========================
-def delete_all_data():
-    save_json(BOOKS_JSON, [])
-    save_json(COMMENTS_JSON, [])
-    for p in COVERS_DIR.glob("*"):
-        try:
-            p.unlink()
-        except:
-            pass
 
 
 # =========================
@@ -230,11 +243,13 @@ def book_card(b):
         st.markdown("  •  ".join(meta) if meta else "_Sin detalles_")
         if b.get("description"):
             st.markdown(b["description"])
+
         with st.expander("💬 Comentarios"):
             for c in get_comments(b["id"]):
                 st.markdown(f"**{c['user']}** — {c['created_at']}")
                 st.write(c["text"])
                 st.markdown("---")
+
             with st.form(f"comment_form_{b['id']}"):
                 user = st.text_input("Tu nombre", key=f"name_{b['id']}")
                 text = st.text_area("Escribe un comentario", key=f"text_{b['id']}")
@@ -252,12 +267,15 @@ def main():
     ensure_storage()
     st.title("📚 BookBlog — Blog colaborativo de libros")
 
+    # Sidebar: buscador
     st.sidebar.header("Buscar")
     q = st.sidebar.text_input("Título, autor, tag o descripción")
     st.sidebar.caption("Deja vacío para ver todo.")
 
+    # Tabs principales
     tab_list = st.tabs(["🔎 Explorar", "➕ Agregar libro", "📤 Exportar / 📥 Importar"])
 
+    # ====== Tab: Explorar ======
     with tab_list[0]:
         results = search_books(q)
         st.write(f"Resultados: **{len(results)}**")
@@ -268,6 +286,7 @@ def main():
                 st.divider()
                 book_card(b)
 
+    # ====== Tab: Agregar ======
     with tab_list[1]:
         st.subheader("Nuevo libro")
         with st.form("new_book"):
@@ -290,25 +309,48 @@ def main():
                     st.success(f"Libro agregado: {book['title']}")
                     st.rerun()
 
+    # ====== Tab: Exportar / Importar ======
     with tab_list[2]:
         st.subheader("📤 Exportar")
+
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.download_button("Descargar books.json", data=export_json_bytes(BOOKS_JSON),
-                               file_name="books.json", mime="application/json", use_container_width=True)
+            st.download_button(
+                "Descargar books.json",
+                data=export_json_bytes(BOOKS_JSON),
+                file_name="books.json",
+                mime="application/json",
+                use_container_width=True,
+            )
         with c2:
-            st.download_button("Descargar comments.json", data=export_json_bytes(COMMENTS_JSON),
-                               file_name="comments.json", mime="application/json", use_container_width=True)
+            st.download_button(
+                "Descargar comments.json",
+                data=export_json_bytes(COMMENTS_JSON),
+                file_name="comments.json",
+                mime="application/json",
+                use_container_width=True,
+            )
         with c3:
-            st.download_button("Backup completo (.zip)", data=make_backup_zip_bytes(),
-                               file_name="bookblog_backup.zip", mime="application/zip", use_container_width=True)
+            st.download_button(
+                "Backup completo (.zip)",
+                data=make_backup_zip_bytes(),
+                file_name="bookblog_backup.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
 
         st.divider()
         st.subheader("📥 Importar")
 
-        mode = st.radio("Modo de importación", ["replace", "merge"], index=1,
-                        help="replace: reemplaza todo. merge: fusiona por id.", horizontal=True)
+        mode = st.radio(
+            "Modo de importación",
+            ["replace", "merge"],
+            index=1,
+            help="replace: reemplaza completamente. merge: fusiona por id.",
+            horizontal=True,
+        )
 
+        st.markdown("**Importar JSON sueltos**")
         c4, c5 = st.columns(2)
         with c4:
             up_books = st.file_uploader("Subir books.json", type=["json"], key="up_books_json")
@@ -324,18 +366,11 @@ def main():
                 st.rerun()
 
         st.markdown("---")
-        st.markdown("**Restaurar desde backup .zip**")
+        st.markdown("**Restaurar desde backup .zip** (incluye portadas)")
         up_zip = st.file_uploader("Subir bookblog_backup.zip", type=["zip"], key="up_zip_backup")
         if up_zip and st.button("Restaurar ZIP", type="primary", use_container_width=True):
             restore_from_zip_bytes(up_zip.read(), mode=mode)
             st.success("Backup restaurado.")
-            st.rerun()
-
-        st.markdown("---")
-        st.error("⚠️ ¡Acción peligrosa!")
-        if st.button("🗑️ Borrar todo", type="primary", use_container_width=True):
-            delete_all_data()
-            st.success("Todos los datos fueron eliminados.")
             st.rerun()
 
 
