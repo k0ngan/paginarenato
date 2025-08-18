@@ -231,7 +231,7 @@ def main():
 
     st.sidebar.header("🔐 Admin")
     admin_key = st.sidebar.text_input("Clave de administrador", type="password")
-    is_admin = (admin_key == "1234")  # <<< Cambia la clave aquí
+    is_admin = (admin_key == "1234")  # Cambia la clave aquí
 
     # Tabs según permisos
     if is_admin:
@@ -276,17 +276,42 @@ def main():
     # Tab Admin (solo visible si clave correcta)
     if is_admin:
         with tab_list[2]:
-            st.subheader("📤 Exportar / 📥 Importar")
+            st.subheader("📤 Exportar")
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.download_button("Descargar books.json", data=export_json_bytes(BOOKS_JSON),
+                st.download_button("books.json", data=export_json_bytes(BOOKS_JSON),
                                    file_name="books.json", mime="application/json")
             with c2:
-                st.download_button("Descargar comments.json", data=export_json_bytes(COMMENTS_JSON),
+                st.download_button("comments.json", data=export_json_bytes(COMMENTS_JSON),
                                    file_name="comments.json", mime="application/json")
             with c3:
                 st.download_button("Backup completo (.zip)", data=make_backup_zip_bytes(),
                                    file_name="bookblog_backup.zip", mime="application/zip")
+
+            st.divider()
+            st.subheader("📥 Importar")
+            mode = st.radio("Modo de importación", ["replace", "merge"], index=1,
+                            help="replace = reemplaza todo, merge = fusiona por id", horizontal=True)
+
+            c4, c5 = st.columns(2)
+            with c4:
+                up_books = st.file_uploader("Subir books.json", type=["json"], key="up_books_json")
+                if up_books and st.button("Importar books.json"):
+                    import_json_bytes(BOOKS_JSON, up_books.read(), mode=mode)
+                    st.success("books.json importado.")
+                    st.rerun()
+            with c5:
+                up_comments = st.file_uploader("Subir comments.json", type=["json"], key="up_comments_json")
+                if up_comments and st.button("Importar comments.json"):
+                    import_json_bytes(COMMENTS_JSON, up_comments.read(), mode=mode)
+                    st.success("comments.json importado.")
+                    st.rerun()
+
+            up_zip = st.file_uploader("Subir backup .zip", type=["zip"], key="up_zip")
+            if up_zip and st.button("Restaurar ZIP"):
+                restore_from_zip_bytes(up_zip.read(), mode=mode)
+                st.success("Backup restaurado.")
+                st.rerun()
 
             st.divider()
             st.error("⚠️ Acción peligrosa")
